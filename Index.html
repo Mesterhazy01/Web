@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geo Games</title>
+<style>
+body { font-family: Arial; text-align: center; background: #111; color: #eee; margin:0; }
+header { padding: 20px; font-size: 28px; font-weight: bold; background:#1a1a1a;}
+input, select { padding: 8px; margin: 5px; border-radius: 5px; border: none; width: 80%; max-width: 300px; }
+button { padding: 10px 20px; background: #0f0; color: black; border: none; border-radius: 5px; cursor: pointer; margin:5px;}
+section { padding: 20px; }
+#profile { display:none; }
+ul { list-style:none; padding:0; }
+li { margin:5px 0; }
+nav a { color:#0f0; margin:0 10px; text-decoration:none; font-weight:bold; }
+nav a:hover { text-decoration: underline; }
+
+/* Rangok stílus */
+.rank { font-weight:bold; padding: 2px 6px; border-radius: 4px; margin-left:10px; }
+.rank-tiltott{background:#555;color:#fff;}
+.rank-tag{background:#0f0;color:#000;}
+.rank-felhasznalo{background:#00f;color:#fff;}
+.rank-vip{background:#ff0;color:#000;}
+.rank-game{background:#f80;color:#000;}
+.rank-tech{background:#0ff;color:#000;}
+.rank-media{background:#f0f;color:#000;}
+.rank-media-plus{background:#ff69b4;color:#000;}
+.rank-moderator{background:#f00;color:#fff;}
+.rank-admin{background:#800080;color:#fff;}
+</style>
+</head>
+<body>
+
+<header>🌍 Geo Games</header>
+
+<nav>
+<a href="#home" onclick="showSection('home')">Kezdőoldal</a>
+<a href="#auth" onclick="showSection('auth')">Belépés / Regisztráció</a>
+<a href="#profile" onclick="showSection('profile')">Profil</a>
+</nav>
+
+<section id="home">
+<h2>Üdv a Geo Games világában!</h2>
+<p>Fedezd fel játékainkat, kövesd a pontjaid, gyűjts jelvényeket és lépj rangokat!</p>
+</section>
+
+<section id="auth">
+<h2>Regisztráció / Belépés</h2>
+<input type="text" id="name" placeholder="Neved (csak regisztrációhoz)"><br>
+<input type="email" id="email" placeholder="Email"><br>
+<input type="password" id="password" placeholder="Jelszó"><br>
+<button onclick="regisztral()">Regisztráció</button>
+<button onclick="belep()">Belépés</button>
+</section>
+
+<section id="profile">
+<h2>Üdv, <span id="username"></span>!</h2>
+<p>Rang: <span id="rank" class="rank">Felhasználó</span></p>
+<p>GeoPoint pontjaid: <span id="geopoints">0</span></p>
+
+<h3>Játékok / Programok:</h3>
+<ul id="gameslist"></ul>
+
+<h3>Jelvények:</h3>
+<ul id="badgeslist"><li>Nincs jelvény még</li></ul>
+
+<button onclick="kilep()">Kijelentkezés</button>
+</section>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+<script>
+// Firebase konfiguráció - cseréld a sajátodra!
+const firebaseConfig = {
+  apiKey: "IDE_JÖN_A_KULCSOD",
+  authDomain: "YOURPROJECT.firebaseapp.com",
+  projectId: "YOURPROJECT",
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Navigációhoz
+function showSection(id){
+  document.querySelectorAll("section").forEach(sec=>sec.style.display="none");
+  document.getElementById(id).style.display="block";
+}
+
+// Alapértelmezett: home
+showSection('home');
+
+// Regisztráció
+function regisztral(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const name = document.getElementById("name").value || "Felhasználó";
+  auth.createUserWithEmailAndPassword(email,password)
+    .then((cred)=>{
+      db.collection("users").doc(cred.user.uid).set({
+        name: name,
+        geoPoints: 0,
+        games: [],
+        badges: [],
+        rank: "felhasznalo"
+      });
+      alert("Sikeres regisztráció!");
+      loadProfile(cred.user.uid);
+    })
+    .catch(e=>alert(e.message));
+}
+
+// Belépés
+function belep(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  auth.signInWithEmailAndPassword(email,password)
+    .then((cred)=>{ loadProfile(cred.user.uid); })
+    .catch(e=>alert(e.message));
+}
+
+// Profil betöltése
+function loadProfile(uid){
+  showSection('profile');
+  const userDoc = db.collection("users").doc(uid);
+  userDoc.onSnapshot((doc)=>{
+    const data = doc.data();
+    document.getElementById("username").innerText = data.name;
+    document.getElementById("geopoints").innerText = data.geoPoints;
+
+    // Rang
+    const rankSpan = document.getElementById("rank");
+    rankSpan.innerText = data.rank || "felhasznalo";
+    rankSpan.className = "rank rank-" + (data.rank || "felhasznalo").toLowerCase();
+
+    // Játékok
+    const gamesList = document.getElementById("gameslist");
+    gamesList.innerHTML = "";
+    if(!data.games || data.games.length===0){ gamesList.innerHTML="<li>Nincs játék</li>"; }
+    else data.games.forEach(g=>{ gamesList.innerHTML+="<li>"+g+"</li>"; });
+
+    // Jelvények
+    const badgesList = document.getElementById("badgeslist");
+    badgesList.innerHTML = "";
+    if(!data.badges || data.badges.length===0){ badgesList.innerHTML="<li>Nincs jelvény még</li>"; }
+    else data.badges.forEach(b=>{ badgesList.innerHTML+="<li>"+b+"</li>"; });
+  });
+}
+
+// Kijelentkezés
+function kilep(){ 
+  auth.signOut().then(()=>{ showSection('auth'); }); 
+}
+
+// Automatikus login
+auth.onAuthStateChanged(user=>{
+  if(user) loadProfile(user.uid);
+  else showSection('home');
+});
+</script>
+
+</body>
+</html>
